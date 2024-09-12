@@ -1,6 +1,8 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
+use cli_clipboard::{ClipboardContext, ClipboardProvider};
 use image::io::Reader;
+use serde::Serialize;
 use std::io::{self, Write};
 
 #[derive(Debug, Subcommand)]
@@ -34,6 +36,38 @@ enum Commands {
         shutter_speed: String,
         iso: String,
     },
+    /// Add instagram post content to clipboard
+    #[command(arg_required_else_help = true)]
+    InstagramCaption {
+        #[clap(default_value = ".")]
+        title: String,
+        camera: String,
+        film: String,
+        #[clap(default_value = "@nanni_lab")]
+        lab: String,
+        #[clap(default_value_t, value_enum)]
+        film_type: FilmType,
+    },
+}
+
+#[derive(clap::ValueEnum, Clone, Default, Debug, Serialize)]
+#[serde(rename_all = "kebab-case")]
+enum ImageMode {
+    /// ImageMagick
+    #[default]
+    ImageMagick,
+    /// image::io
+    Native,
+}
+
+#[derive(clap::ValueEnum, Clone, Default, Debug, Serialize)]
+#[serde(rename_all = "kebab-case")]
+enum FilmType {
+    /// Color film
+    #[default]
+    Color,
+    /// Black & White film
+    BlackAndWhite,
 }
 
 /// Execute a command for a specific image
@@ -46,6 +80,9 @@ struct Cli {
     /// The path to the image
     #[arg(short, long)]
     path: std::path::PathBuf,
+    /// The image mode used
+    #[arg(short, long, default_value_t, value_enum)]
+    image_mode: ImageMode,
 }
 
 fn get_image_dimensions(file_path: &std::path::PathBuf) -> Result<(u32, u32)> {
@@ -142,7 +179,62 @@ fn main() {
                 Err(e) => println!("error: {}", e),
             }
         }
+        Commands::InstagramCaption {
+            title,
+            camera,
+            film,
+            lab,
+            film_type,
+        } => {
+            let mut text = String::new();
+            text.push_str(&format!("{}\n", title));
+            text.push_str(&format!("📸 {}\n", camera));
+            text.push_str(&format!("🎞️ {}\n", film));
+            text.push_str(&format!("🧪 {}\n\n", lab));
+            text.push_str(&hashtags_by_film(&film, &film_type, &camera));
+
+            let mut ctx = ClipboardContext::new().expect("Could not create a clipboard provider.");
+            _ = ctx.set_contents(text);
+        }
     }
+}
+
+fn hashtags_by_film(film: &str, film_type: &FilmType, camera: &str) -> String {
+    let mut hashtags = String::new();
+    match film_type {
+        FilmType::Color => {
+            hashtags.push_str("#35mm #colorFilm #filmPhotography #analogPhotography #filmIsNotDead #iStillShootFilm #shootFilm #filmCommunity #filmLovers #colorFilmPhotography #35mmFilm #filmShooter #analogLove #filmLife #analogVibes #analogLove");
+        }
+        FilmType::BlackAndWhite => {
+            hashtags.push_str("#35mm #blackAndWhitePhotography #BWPhotography #analogPhotography #filmPhotography #classicBW #filmIsNotDead #shootFilm #iStillShootFilm #filmCommunity #BWFilm #BWFilmPhotography #filmLovers #monochromePhotography #35mmFilm #filmShooter #BlackAndWhiteFilm #analogLove #filmLife");
+        }
+    };
+
+    accumulate_slices(film, ' ')
+        .iter_mut()
+        .for_each(|str| hashtags.push_str(&format!(" #{}", str)));
+
+    accumulate_slices(camera, ' ')
+        .iter_mut()
+        .for_each(|str| hashtags.push_str(&format!(" #{}", str)));
+
+    hashtags
+}
+
+fn accumulate_slices(input: &str, separator: char) -> Vec<String> {
+    let slices: Vec<&str> = input.split(separator).collect();
+    let mut result = Vec::new();
+    let mut current = String::new();
+
+    for slice in slices {
+        if slice.starts_with('(') {
+            continue;
+        }
+        current.push_str(slice);
+        result.push(current.clone());
+    }
+
+    result
 }
 
 fn add_border(width: u32, height: u32, path: &std::path::PathBuf) -> std::path::PathBuf {
