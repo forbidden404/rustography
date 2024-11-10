@@ -39,14 +39,14 @@ enum Commands {
     /// Add instagram post content to clipboard
     #[command(arg_required_else_help = true)]
     InstagramCaption {
-        #[clap(default_value = ".")]
-        title: String,
         camera: String,
         film: String,
-        #[clap(default_value = "@nanni_lab")]
-        lab: String,
         #[clap(default_value_t, value_enum)]
         film_type: FilmType,
+        #[clap(default_value = "@nanni_lab")]
+        lab: String,
+        #[clap(default_value = ".")]
+        title: String,
     },
 }
 
@@ -68,6 +68,10 @@ enum FilmType {
     Color,
     /// Black & White film
     BlackAndWhite,
+    /// Lomography Color film
+    LomographyColor,
+    /// Lomography Black & White film
+    LomographyBlackAndWhite,
 }
 
 /// Execute a command for a specific image
@@ -180,14 +184,14 @@ fn main() {
             }
         }
         Commands::InstagramCaption {
-            title,
             camera,
             film,
-            lab,
             film_type,
+            lab,
+            title,
         } => {
             let mut text = String::new();
-            text.push_str(&format!("{}\n", title));
+            text.push_str(&format!("{}\n\n", title));
             text.push_str(&format!("📸 {}\n", camera));
             text.push_str(&format!("🎞️ {}\n", film));
             text.push_str(&format!("🧪 {}\n\n", lab));
@@ -202,12 +206,19 @@ fn main() {
 fn hashtags_by_film(film: &str, film_type: &FilmType, camera: &str) -> String {
     let mut hashtags = String::new();
     match film_type {
-        FilmType::Color => {
+        FilmType::Color | FilmType::LomographyColor => {
             hashtags.push_str("#35mm #colorFilm #filmPhotography #analogPhotography #filmIsNotDead #iStillShootFilm #shootFilm #filmCommunity #filmLovers #colorFilmPhotography #35mmFilm #filmShooter #analogLove #filmLife #analogVibes #analogLove");
         }
-        FilmType::BlackAndWhite => {
+        FilmType::BlackAndWhite | FilmType::LomographyBlackAndWhite => {
             hashtags.push_str("#35mm #blackAndWhitePhotography #BWPhotography #analogPhotography #filmPhotography #classicBW #filmIsNotDead #shootFilm #iStillShootFilm #filmCommunity #BWFilm #BWFilmPhotography #filmLovers #monochromePhotography #35mmFilm #filmShooter #BlackAndWhiteFilm #analogLove #filmLife");
         }
+    };
+
+    match film_type {
+        FilmType::LomographyBlackAndWhite | FilmType::LomographyColor => {
+            hashtags.push_str(" #HeyLomography")
+        }
+        _ => {}
     };
 
     accumulate_slices(film, ' ')
@@ -230,7 +241,11 @@ fn accumulate_slices(input: &str, separator: char) -> Vec<String> {
         if slice.starts_with('(') {
             continue;
         }
-        current.push_str(slice);
+        let mut initial_index = 0;
+        if slice.starts_with('@') {
+            initial_index = 1;
+        }
+        current.push_str(&slice[initial_index..]);
         result.push(current.clone());
     }
 
@@ -253,7 +268,7 @@ fn add_border(width: u32, height: u32, path: &std::path::PathBuf) -> std::path::
     let mut new_path = path.to_owned();
     new_path.set_file_name(file_name);
 
-    let cmd = std::process::Command::new("convert")
+    let cmd = std::process::Command::new("magick")
         .arg(path.to_str().expect("Couldn't turn path to string"))
         .args(["-bordercolor", "white"])
         .args(["-border", op])
@@ -304,7 +319,7 @@ fn fill_to_aspect_ratio(
     let mut new_path = path.to_owned();
     new_path.set_file_name(file_name);
 
-    let cmd = std::process::Command::new("convert")
+    let cmd = std::process::Command::new("magick")
         .arg(path.to_str().expect("Couldn't turn path to string"))
         .args(["-bordercolor", "white"])
         .args(["-border", &op])
@@ -347,7 +362,7 @@ fn add_caption(
         camera, focal_length, aperture, shutter_speed, iso
     );
 
-    let cmd = std::process::Command::new("convert")
+    let cmd = std::process::Command::new("magick")
         .arg(path.to_str().expect("Couldn't turn path to string"))
         .args(["-background", "white"])
         .args(["-fill", "grey25"])
