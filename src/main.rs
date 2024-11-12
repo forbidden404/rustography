@@ -198,7 +198,8 @@ fn main() {
             text.push_str(&hashtags_by_film(&film, &film_type, &camera));
 
             let mut ctx = ClipboardContext::new().expect("Could not create a clipboard provider.");
-            _ = ctx.set_contents(text);
+            _ = ctx.set_contents(text.clone());
+            println!("{}", text);
         }
     }
 }
